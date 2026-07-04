@@ -25,6 +25,8 @@ A simple three-tier application (Frontend → Backend → PostgreSQL) containeri
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
 - [Docker](https://docs.docker.com/get-docker/)
 
+ - Follow the steps outlined here to set up Minikube on your system: https://crishantha.medium.com/running-minikube-on-aws-ec2-e845337a956 
+ 
 ## CI/CD Setup (GitHub Actions)
 
 Add the following secrets to your GitHub repository (`Settings → Secrets → Actions`):
