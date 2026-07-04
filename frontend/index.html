@@ -208,6 +208,60 @@
       color: #ef4444;
     }
 
+    .btn-edit {
+      padding: 6px 12px;
+      background: transparent;
+      border: 1px solid #2a2a3d;
+      border-radius: 7px;
+      color: #6b7280;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s, border-color 0.2s;
+      flex-shrink: 0;
+      margin-right: 6px;
+    }
+
+    .btn-edit:hover {
+      background: rgba(124,58,237,0.1);
+      border-color: #7c3aed;
+      color: #a78bfa;
+    }
+
+    .edit-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .edit-row input {
+      flex: 1;
+      padding: 8px 12px;
+      font-size: 0.875rem;
+    }
+
+    .btn-save {
+      padding: 8px 14px;
+      background: linear-gradient(135deg, #7c3aed, #2563eb);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .btn-cancel {
+      padding: 8px 14px;
+      background: transparent;
+      border: 1px solid #2a2a3d;
+      border-radius: 8px;
+      color: #6b7280;
+      font-size: 0.78rem;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
     /* ── Empty state ── */
     .empty {
       text-align: center;
@@ -291,7 +345,7 @@
         }
 
         list.innerHTML = items.map(i => `
-          <li>
+          <li id="item-${i.id}">
             <div class="item-left">
               <div class="item-dot"></div>
               <div>
@@ -299,7 +353,10 @@
                 <div class="item-date">${formatDate(i.created_at)}</div>
               </div>
             </div>
-            <button class="btn-del" onclick="deleteItem(${i.id})">Remove</button>
+            <div>
+              <button class="btn-edit" onclick="startEdit(${i.id}, '${escapeHtml(i.name)}')">Edit</button>
+              <button class="btn-del" onclick="deleteItem(${i.id})">Remove</button>
+            </div>
           </li>`).join('');
       } catch {
         document.getElementById('error').textContent = 'Could not connect to the server.';
@@ -332,6 +389,48 @@
     async function deleteItem(id) {
       await fetch(`${API}/api/items/${id}`, { method: 'DELETE' });
       fetchItems();
+    }
+
+    function startEdit(id, currentName) {
+      const li = document.getElementById(`item-${id}`);
+      const nameEl = li.querySelector('.item-name');
+      const dateEl = li.querySelector('.item-date');
+      const btnGroup = li.querySelector('div:last-child');
+      nameEl.innerHTML = `
+        <div class="edit-row">
+          <input id="edit-input-${id}" value="${currentName}" maxlength="200" />
+          <button class="btn-save" onclick="saveEdit(${id})">Save</button>
+          <button class="btn-cancel" onclick="fetchItems()">Cancel</button>
+        </div>`;
+      dateEl.style.display = 'none';
+      btnGroup.style.display = 'none';
+      document.getElementById(`edit-input-${id}`).focus();
+      document.getElementById(`edit-input-${id}`).addEventListener('keydown', e => {
+        if (e.key === 'Enter') saveEdit(id);
+        if (e.key === 'Escape') fetchItems();
+      });
+    }
+
+    async function saveEdit(id) {
+      const input = document.getElementById(`edit-input-${id}`);
+      const name = input.value.trim();
+      if (!name) return;
+      const errEl = document.getElementById('error');
+      try {
+        const res = await fetch(`${API}/api/items/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        });
+        if (res.ok) {
+          errEl.textContent = '';
+          fetchItems();
+        } else {
+          errEl.textContent = 'Failed to update item.';
+        }
+      } catch {
+        errEl.textContent = 'Could not connect to the server.';
+      }
     }
 
     function escapeHtml(str) {

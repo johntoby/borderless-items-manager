@@ -61,6 +61,23 @@ app.post('/api/items', async (req, res) => {
   }
 });
 
+app.put('/api/items/:id', async (req, res) => {
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: 'name is required' });
+  if (typeof name !== 'string' || name.trim().length === 0) return res.status(400).json({ error: 'name must be a non-empty string' });
+  if (name.length > 200) return res.status(400).json({ error: 'name must be 200 characters or fewer' });
+  try {
+    const result = await pool.query(
+      'UPDATE items SET name = $1 WHERE id = $2 RETURNING *',
+      [name.trim(), req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Item not found' });
+    res.json(result.rows[0]);
+  } catch {
+    res.status(500).json({ error: 'Failed to update item' });
+  }
+});
+
 app.delete('/api/items/:id', async (req, res) => {
   try {
     await pool.query('DELETE FROM items WHERE id = $1', [req.params.id]);
