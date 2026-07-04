@@ -4,7 +4,7 @@ metadata:
   name: borderless-backend
   namespace: borderless
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     matchLabels:
       app: borderless-backend

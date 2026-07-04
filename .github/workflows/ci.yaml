@@ -1,4 +1,4 @@
-name: Borderless Item Manager CI/CD pipeline
+name: Borderless Items Manager CI/CD pipeline
 
 on:
   push:
