@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Borderless Item Manager</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: #0f0f13;
+      color: #e8e8f0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 16px;
+    }
+
+    /* ── Header ── */
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #7c3aed, #2563eb);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #a78bfa, #60a5fa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      font-size: 0.875rem;
+      color: #6b7280;
+      margin-top: 4px;
+    }
+
+    /* ── Card ── */
+    .card {
+      width: 100%;
+      max-width: 560px;
+      background: #16161f;
+      border: 1px solid #1f1f2e;
+      border-radius: 16px;
+      padding: 28px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+    }
+
+    /* ── Input row ── */
+    .input-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    input {
+      flex: 1;
+      padding: 12px 16px;
+      background: #0f0f13;
+      border: 1px solid #2a2a3d;
+      border-radius: 10px;
+      color: #e8e8f0;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input::placeholder { color: #4b5563; }
+
+    input:focus { border-color: #7c3aed; }
+
+    .btn-add {
+      padding: 12px 20px;
+      background: linear-gradient(135deg, #7c3aed, #2563eb);
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    .btn-add:hover { opacity: 0.9; }
+    .btn-add:active { transform: scale(0.97); }
+
+    .error {
+      font-size: 0.8rem;
+      color: #f87171;
+      min-height: 18px;
+      margin-bottom: 20px;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .divider-line { flex: 1; height: 1px; background: #1f1f2e; }
+
+    .divider-label {
+      font-size: 0.75rem;
+      color: #4b5563;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    /* ── Item count badge ── */
+    .count-badge {
+      display: inline-block;
+      background: #1f1f2e;
+      color: #a78bfa;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 2px 10px;
+      border-radius: 999px;
+    }
+
+    /* ── List ── */
+    ul { list-style: none; }
+
+    li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      background: #0f0f13;
+      border: 1px solid #1f1f2e;
+      border-radius: 10px;
+      margin-bottom: 8px;
+      animation: slideIn 0.2s ease;
+      transition: border-color 0.2s;
+    }
+
+    li:hover { border-color: #2a2a3d; }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .item-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .item-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #7c3aed, #2563eb);
+      flex-shrink: 0;
+    }
+
+    .item-name {
+      font-size: 0.95rem;
+      color: #d1d5db;
+    }
+
+    .item-date {
+      font-size: 0.72rem;
+      color: #4b5563;
+      margin-top: 2px;
+    }
+
+    .btn-del {
+      padding: 6px 12px;
+      background: transparent;
+      border: 1px solid #2a2a3d;
+      border-radius: 7px;
+      color: #6b7280;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s, border-color 0.2s;
+      flex-shrink: 0;
+    }
+
+    .btn-del:hover {
+      background: rgba(239,68,68,0.1);
+      border-color: #ef4444;
+      color: #ef4444;
+    }
+
+    /* ── Empty state ── */
+    .empty {
+      text-align: center;
+      padding: 40px 0;
+      color: #4b5563;
+    }
+
+    .empty-icon { font-size: 2rem; margin-bottom: 8px; }
+    .empty p { font-size: 0.875rem; }
+
+    /* ── Loading skeleton ── */
+    .skeleton {
+      height: 52px;
+      background: linear-gradient(90deg, #1a1a26 25%, #1f1f2e 50%, #1a1a26 75%);
+      background-size: 200% 100%;
+      border-radius: 10px;
+      margin-bottom: 8px;
+      animation: shimmer 1.4s infinite;
+    }
+
+    @keyframes shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">
+      <div class="logo-icon">✦</div>
+      <h1>Borderless Item Manager</h1>
+    </div>
+    <p class="subtitle">Add, track, and remove items — no limits.</p>
+  </header>
+
+  <div class="card">
+    <div class="input-row">
+      <input id="itemInput" placeholder="What needs to be tracked?" />
+      <button class="btn-add" onclick="addItem()">+ Add</button>
+    </div>
+    <p class="error" id="error"></p>
+
+    <div class="divider">
+      <div class="divider-line"></div>
+      <span class="divider-label">Items</span>
+      <span class="count-badge" id="count">0</span>
+      <div class="divider-line"></div>
+    </div>
+
+    <ul id="itemList">
+      <div class="skeleton"></div>
+      <div class="skeleton" style="opacity:0.6"></div>
+      <div class="skeleton" style="opacity:0.3"></div>
+    </ul>
+  </div>
+
+  <script>
+    const API = window.BACKEND_URL || '';
+
+    function formatDate(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    async function fetchItems() {
+      try {
+        const res = await fetch(`${API}/api/items`);
+        const items = await res.json();
+        const list = document.getElementById('itemList');
+        document.getElementById('count').textContent = items.length;
+
+        if (items.length === 0) {
+          list.innerHTML = `
+            <div class="empty">
+              <div class="empty-icon">📭</div>
+              <p>No items yet. Add one above.</p>
+            </div>`;
+          return;
+        }
+
+        list.innerHTML = items.map(i => `
+          <li>
+            <div class="item-left">
+              <div class="item-dot"></div>
+              <div>
+                <div class="item-name">${escapeHtml(i.name)}</div>
+                <div class="item-date">${formatDate(i.created_at)}</div>
+              </div>
+            </div>
+            <button class="btn-del" onclick="deleteItem(${i.id})">Remove</button>
+          </li>`).join('');
+      } catch {
+        document.getElementById('error').textContent = 'Could not connect to the server.';
+      }
+    }
+
+    async function addItem() {
+      const input = document.getElementById('itemInput');
+      const name = input.value.trim();
+      if (!name) return;
+      const errEl = document.getElementById('error');
+      try {
+        const res = await fetch(`${API}/api/items`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        });
+        if (res.ok) {
+          input.value = '';
+          errEl.textContent = '';
+          fetchItems();
+        } else {
+          errEl.textContent = 'Failed to add item.';
+        }
+      } catch {
+        errEl.textContent = 'Could not connect to the server.';
+      }
+    }
+
+    async function deleteItem(id) {
+      await fetch(`${API}/api/items/${id}`, { method: 'DELETE' });
+      fetchItems();
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    document.getElementById('itemInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') addItem();
+    });
+
+    fetchItems();
+  </script>
+</body>
+</html>
