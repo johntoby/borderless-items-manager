@@ -7,4 +7,4 @@ data:
   DB_HOST: "borderless-postgres-service"
   DB_PORT: "5432"
   DB_NAME: "appdb"
-  CORS_ORIGIN: "http://localhost:8080"
+  CORS_ORIGIN: "http://100.58.128.188:8080"
