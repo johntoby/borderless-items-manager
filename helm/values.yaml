@@ -1,0 +1,50 @@
+namespace: borderless
+
+backend:
+  image: johntoby/borderless-items-manager-backend
+  tag: latest
+  replicas: 2
+  port: 5000
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+frontend:
+  image: johntoby/borderless-items-manager-frontend
+  tag: latest
+  replicas: 2
+  port: 80
+  nodePort: 30080
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "128Mi"
+
+postgres:
+  image: postgres
+  tag: 15-alpine
+  port: 5432
+  database: appdb
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  storage: 1Gi
+  storageClassName: standard
+
+config:
+  corsOrigin: "http://localhost:8080"
+
+secret:
+  dbUser: cG9zdGdyZXM=
+  dbPassword: cGFzc3dvcmQ=

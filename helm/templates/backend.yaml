@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: borderless-backend
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.backend.replicas }}
+  selector:
+    matchLabels:
+      app: borderless-backend
+  template:
+    metadata:
+      labels:
+        app: borderless-backend
+    spec:
+      containers:
+        - name: backend
+          image: "{{ .Values.backend.image }}:{{ .Values.backend.tag }}"
+          imagePullPolicy: Always
+          ports:
+            - containerPort: {{ .Values.backend.port }}
+          resources:
+            requests:
+              cpu: {{ .Values.backend.resources.requests.cpu }}
+              memory: {{ .Values.backend.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.backend.resources.limits.cpu }}
+              memory: {{ .Values.backend.resources.limits.memory }}
+          env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: borderless-config
+                  key: DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: borderless-config
+                  key: DB_PORT
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: borderless-config
+                  key: DB_NAME
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: borderless-secret
+                  key: DB_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: borderless-secret
+                  key: DB_PASSWORD
+            - name: CORS_ORIGIN
+              valueFrom:
+                configMapKeyRef:
+                  name: borderless-config
+                  key: CORS_ORIGIN
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.backend.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.backend.port }}
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: borderless-backend-service
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: borderless-backend
+  ports:
+    - port: {{ .Values.backend.port }}
+      targetPort: {{ .Values.backend.port }}
