@@ -1,0 +1,6 @@
+apiVersion: v2
+name: borderless-items-manager
+description: A three-tier Kubernetes app - Frontend, Backend, PostgreSQL
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
