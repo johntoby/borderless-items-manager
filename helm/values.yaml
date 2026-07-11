@@ -3,7 +3,7 @@ namespace: borderless
 backend:
   image: johntoby/borderless-items-manager-backend
   tag: latest
-  replicas: 2
+  replicas: 5
   port: 5000
   resources:
     requests:
