@@ -43,7 +43,7 @@ postgres:
   storageClassName: standard
 
 config:
-  corsOrigin: "http://localhost:8080"
+  corsOrigin: "http://13.222.198.37:8080"
 
 secret:
   dbUser: cG9zdGdyZXM=
