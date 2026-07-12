@@ -1,0 +1,55 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: borderless-backend-alerts
+  namespace: borderless
+  labels:
+    release: monitoring
+spec:
+  groups:
+    - name: borderless-backend
+      rules:
+        - alert: HighErrorRate
+          expr: rate(http_errors_total{app="borderless-backend"}[5m]) / rate(http_requests_total{app="borderless-backend"}[5m]) > 0.05
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "High error rate on backend"
+            description: "Error rate is above 5% for the last 2 minutes (current: {{ $value | humanizePercentage }})"
+
+        - alert: HighLatency
+          expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{app="borderless-backend"}[5m])) > 1
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High latency on backend"
+            description: "95th percentile latency is above 1 second for the last 2 minutes (current: {{ $value }}s)"
+
+        - alert: PodDown
+          expr: kube_deployment_status_replicas_available{deployment="borderless-backend", namespace="borderless"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Backend is down"
+            description: "No backend pods are available"
+
+        - alert: PostgresDown
+          expr: kube_statefulset_status_replicas_ready{statefulset="borderless-postgres", namespace="borderless"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "PostgreSQL is down"
+            description: "No Postgres pods are ready"
+
+        - alert: HighMemoryUsage
+          expr: container_memory_usage_bytes{namespace="borderless", container="backend"} / container_spec_memory_limit_bytes{namespace="borderless", container="backend"} > 0.85
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Backend memory usage high"
+            description: "Backend is using more than 85% of its memory limit"

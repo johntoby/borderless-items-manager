@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: borderless-backend-monitor
+  namespace: borderless
+  labels:
+    release: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: borderless-backend
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s

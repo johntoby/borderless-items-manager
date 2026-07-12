@@ -12,6 +12,10 @@ spec:
     metadata:
       labels:
         app: borderless-backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5000"
+        prometheus.io/path: "/metrics"
     spec:
       containers:
         - name: backend
@@ -80,5 +84,6 @@ spec:
   selector:
     app: borderless-backend
   ports:
-    - port: 5000
+    - name: http
+      port: 5000
       targetPort: 5000
