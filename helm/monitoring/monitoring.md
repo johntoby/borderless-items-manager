@@ -184,6 +184,8 @@ Pod Restarts
 Container Status
 Deployment Replicas
 Node Health
+API server status
+ETCD status
 ```
 
 ## Application Metrics
