@@ -1,5 +1,3 @@
-
-
 # Kubernetes Application Monitoring with Prometheus and Grafana
 
 ## Project Overview
