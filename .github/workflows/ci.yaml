@@ -2,9 +2,9 @@ name: Borderless Items Manager CI/CD pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [monitoring]
   pull_request:
-    branches: [main]
+    branches: [monitoring]
 
 env:
   DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -36,7 +36,7 @@ jobs:
     name: Build & Push Images
     runs-on: ubuntu-latest
     needs: test-backend
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
 
@@ -67,7 +67,7 @@ jobs:
     name: Deploy to EC2 Minikube
     runs-on: ubuntu-latest
     needs: build-and-push
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
 
@@ -80,8 +80,18 @@ jobs:
           script: |
             cd ~/borderless-items-manager || git clone https://github.com/${{ github.repository }}.git ~/borderless-items-manager
             cd ~/borderless-items-manager
-            git pull origin main
+            git fetch origin
+            git checkout monitoring
+            git pull origin monitoring
             helm upgrade --install borderless ./helm
             kubectl rollout restart deployment/borderless-backend -n borderless
             kubectl rollout restart deployment/borderless-frontend -n borderless
+            helm repo add prometheus-community https://prometheus-community.github.io/helm-charts || true
+            helm repo update
+            helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
+              -n monitoring --create-namespace \
+              -f helm/monitoring/values-monitoring.yaml
+            kubectl apply -f helm/monitoring/servicemonitor.yaml
+            kubectl apply -f helm/monitoring/alertrules.yaml
             kubectl get all -n borderless
+            kubectl get pods -n monitoring
