@@ -2,6 +2,9 @@ prometheus:
   prometheusSpec:
     podMonitorSelectorNilUsesHelmValues: false
     serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorNamespaceSelector: {}
+    serviceMonitorNamespaceSelector: {}
+    ruleNamespaceSelector: {}
     additionalScrapeConfigs:
       - job_name: "borderless-backend"
         kubernetes_sd_configs:
