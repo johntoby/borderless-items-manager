@@ -64,6 +64,11 @@ data "aws_iam_policy_document" "github_actions_permissions" {
     resources = [module.eks.cluster_arn]
   }
   statement {
+    effect    = "Allow"
+    actions   = ["iam:GetRole"]
+    resources = [aws_iam_role.csi_secrets.arn]
+  }
+  statement {
     effect = "Allow"
     actions = [
       "secretsmanager:GetSecretValue",
