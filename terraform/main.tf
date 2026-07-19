@@ -125,6 +125,40 @@ module "vpc" {
   tags = var.tags
 }
 
+# ── EKS Node IAM Role ────────────────────────────────────────────────────────
+
+data "aws_iam_policy_document" "node_assume" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["ec2.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "node" {
+  name               = "${var.cluster_name}-node-role"
+  assume_role_policy = data.aws_iam_policy_document.node_assume.json
+  tags               = var.tags
+}
+
+resource "aws_iam_role_policy_attachment" "node_worker" {
+  role       = aws_iam_role.node.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+}
+
+resource "aws_iam_role_policy_attachment" "node_cni" {
+  role       = aws_iam_role.node.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+}
+
+resource "aws_iam_role_policy_attachment" "node_ecr" {
+  role       = aws_iam_role.node.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
 # ── EKS ──────────────────────────────────────────────────────────────────────
 
 module "eks" {
@@ -139,18 +173,33 @@ module "eks" {
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
 
+  # Use the explicitly defined node role
+  create_node_iam_role = false
+
   eks_managed_node_groups = {
     default = {
-      instance_types = [var.node_instance_type]
-      min_size       = 1
-      max_size       = 3
-      desired_size   = 2
+      instance_types  = [var.node_instance_type]
+      min_size        = 1
+      max_size        = 3
+      desired_size    = 2
+      iam_role_arn    = aws_iam_role.node.arn
+      create_iam_role = false
 
       labels = {
         role = "general"
       }
     }
   }
+
+  # Map the node role into the cluster so kubelets can join
+  manage_aws_auth_configmap = true
+  aws_auth_roles = [
+    {
+      rolearn  = aws_iam_role.node.arn
+      username = "system:node:{{EC2PrivateDNSName}}"
+      groups   = ["system:bootstrappers", "system:nodes"]
+    }
+  ]
 
   tags = var.tags
 }

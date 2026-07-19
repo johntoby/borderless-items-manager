@@ -1,3 +1,8 @@
+output "node_role_arn" {
+  description = "IAM role ARN for EKS worker nodes"
+  value       = aws_iam_role.node.arn
+}
+
 output "csi_role_arn" {
   description = "IAM role ARN for the Secrets Store CSI driver service account"
   value       = aws_iam_role.csi_secrets.arn
