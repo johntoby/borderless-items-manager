@@ -105,8 +105,9 @@ After `terraform apply`, add one secret to your GitHub repository under **Settin
 | Secret | Value |
 |---|---|
 | `AWS_ROLE_ARN` | `terraform output -raw github_actions_role_arn` |
+| `GRAFANA_ADMIN_PASSWORD` | A strong password for the Grafana admin user |
 
-This is the only secret needed. The pipeline authenticates to AWS via OIDC — no access keys.
+These are the only secrets needed. The pipeline authenticates to AWS via OIDC — no access keys.
 
 ### 3 — Update helm/values-eks.yaml
 
@@ -140,21 +141,40 @@ test-backend  ──►  build-and-push  ──►  deploy
                    (ECR)                (EKS via Helm)
 ```
 
+`build-and-push` steps in order:
+1. Configure AWS credentials via OIDC
+2. Log in to ECR (produces the registry URL used by the push steps)
+3. Set up Docker Buildx
+4. Build and push backend and frontend images
+
+`deploy` steps in order:
+1. Configure AWS credentials via OIDC
+2. Log in to ECR
+3. Update kubeconfig for EKS
+4. Install Secrets Store CSI driver and AWS provider into `kube-system`
+5. Fetch the CSI IRSA role ARN from AWS
+6. Deploy the app via Helm — injects ECR image URLs and CSI role ARN at deploy time
+7. Deploy the monitoring stack — renders `values-monitoring.yaml` and `alertmanager-secretprovider.yaml` through `envsubst` to inject `GRAFANA_ADMIN_PASSWORD`, `CSI_ROLE_ARN`, and `CLUSTER_NAME` before applying
+8. Print the frontend LoadBalancer URL
+
 Authentication to AWS uses GitHub OIDC — the job requests a short-lived token from GitHub, exchanges it with AWS STS for temporary credentials, and those credentials expire when the job ends. No static keys are stored or rotated.
 
 See `SECRETS.md` for a detailed explanation of how OIDC works.
 
 ## Secrets Management
 
-No credentials are stored in this repository or in GitHub Secrets (except `AWS_ROLE_ARN`, which is a role identifier, not a credential).
+No credentials are stored in this repository or in GitHub Secrets (except `AWS_ROLE_ARN`, which is a role identifier, and `GRAFANA_ADMIN_PASSWORD`).
 
 | Secret | Where it lives |
 |---|---|
 | `DB_USER`, `DB_PASSWORD` | AWS Secrets Manager — `borderless-cluster/app` |
 | Gmail SMTP password | AWS Secrets Manager — `borderless-cluster/alertmanager` |
+| Grafana admin password | GitHub Secret — `GRAFANA_ADMIN_PASSWORD` |
 | AWS credentials for CI | Not stored — OIDC tokens used instead |
 
-At pod startup, the Secrets Store CSI driver pulls values from Secrets Manager using IRSA (IAM Roles for Service Accounts) and syncs them into native Kubernetes Secret objects. The app reads them as normal environment variables.
+Both Secrets Manager secrets are encrypted at rest with a customer-managed KMS key (`alias/borderless-cluster-secrets`) with automatic key rotation enabled.
+
+At pod startup, the Secrets Store CSI driver pulls values from Secrets Manager using IRSA (IAM Roles for Service Accounts) and syncs them into native Kubernetes Secret objects. Both the backend and PostgreSQL pods mount the CSI volume, guaranteeing `borderless-secret` exists before either pod reads from it. The app reads credentials as normal environment variables.
 
 See `SECRETS.md` for the full guide including setup, rotation, and verification steps.
 
@@ -162,20 +182,20 @@ See `SECRETS.md` for the full guide including setup, rotation, and verification 
 
 The monitoring stack runs in the `monitoring` namespace and is deployed automatically by the CI pipeline.
 
-| Tool | Access | Default credentials |
+| Tool | Access | Credentials |
 |---|---|---|
-| Grafana | `kubectl port-forward svc/monitoring-grafana 3000:80 -n monitoring` | `admin` / `admin` |
+| Grafana | `kubectl port-forward svc/monitoring-grafana 3000:80 -n monitoring` | `admin` / value of `GRAFANA_ADMIN_PASSWORD` GitHub Secret |
 | Prometheus | `kubectl port-forward svc/monitoring-kube-prometheus-prometheus 9090 -n monitoring` | — |
 
 A custom Grafana dashboard is included at `helm/monitoring/grafana-dashboard.json` with 8 panels covering request rate, error rate, latency (p50/p95/p99), active connections, requests by route, and memory usage.
 
 Alertmanager is configured to send email alerts to `obacloud007@gmail.com` via Gmail SMTP. Five alert rules are defined in `helm/monitoring/alertrules.yaml`:
 
-- `HighErrorRate` — error rate > 5% for 5 minutes
-- `HighLatency` — p99 latency > 1s for 5 minutes
-- `PodDown` — any pod in the `borderless` namespace not running
-- `PostgresDown` — PostgreSQL pod not running
-- `HighMemoryUsage` — memory usage > 80% of limit
+- `HighErrorRate` — error rate > 5% for 2 minutes
+- `HighLatency` — p95 latency > 1s for 2 minutes
+- `PodDown` — backend deployment has 0 available replicas for 1 minute
+- `PostgresDown` — PostgreSQL StatefulSet has 0 ready replicas for 1 minute
+- `HighMemoryUsage` — backend memory usage > 85% of limit for 2 minutes
 
 ## Application
 
@@ -217,19 +237,28 @@ kubectl rollout restart deployment/borderless-backend -n borderless
 ## Verify Deployment
 
 ```bash
+# Check nodes have joined the cluster
+kubectl get nodes
+
 # Check all pods are running
 kubectl get pods -n borderless
 kubectl get pods -n monitoring
 
-# Check services
+# Check services and get the frontend LoadBalancer URL
 kubectl get svc -n borderless
+
+# Check the CSI driver is running on every node
+kubectl get pods -n kube-system | grep secrets-store
 
 # Check secrets were synced from Secrets Manager
 kubectl get secret borderless-secret -n borderless
 kubectl get secret alertmanager-smtp -n monitoring
 
-# Check nodes have joined the cluster
-kubectl get nodes
+# Check the SecretProviderClass status
+kubectl describe secretproviderclass borderless-aws-secrets -n borderless
+
+# Verify the backend is reading secrets correctly
+kubectl logs -l app=borderless-backend -n borderless | head -20
 ```
 
 ## Rolling Update After a New Image Push

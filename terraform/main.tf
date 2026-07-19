@@ -89,6 +89,11 @@ data "aws_iam_policy_document" "github_actions_permissions" {
       aws_secretsmanager_secret.alertmanager.arn
     ]
   }
+  statement {
+    effect    = "Allow"
+    actions   = ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
+    resources = [aws_kms_key.secrets.arn]
+  }
 }
 
 resource "aws_iam_role_policy" "github_actions" {
@@ -228,10 +233,25 @@ resource "aws_ecr_repository" "frontend" {
   tags = var.tags
 }
 
+# ── KMS key for Secrets Manager encryption ───────────────────────────────────
+
+resource "aws_kms_key" "secrets" {
+  description             = "CMK for ${var.cluster_name} Secrets Manager secrets"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+  tags                    = var.tags
+}
+
+resource "aws_kms_alias" "secrets" {
+  name          = "alias/${var.cluster_name}-secrets"
+  target_key_id = aws_kms_key.secrets.key_id
+}
+
 # ── AWS Secrets Manager ──────────────────────────────────────────────────────
 
 resource "aws_secretsmanager_secret" "app" {
   name                    = "${var.cluster_name}/app"
+  kms_key_id              = aws_kms_key.secrets.arn
   recovery_window_in_days = 7
   tags                    = var.tags
 }
@@ -246,6 +266,7 @@ resource "aws_secretsmanager_secret_version" "app" {
 
 resource "aws_secretsmanager_secret" "alertmanager" {
   name                    = "${var.cluster_name}/alertmanager"
+  kms_key_id              = aws_kms_key.secrets.arn
   recovery_window_in_days = 7
   tags                    = var.tags
 }
@@ -257,23 +278,28 @@ resource "aws_secretsmanager_secret_version" "alertmanager" {
 
 # ── IRSA for Secrets Store CSI Driver ─────────────────────────────────────────
 
+# Use a local to avoid referencing module output inside a string interpolation
+# at plan time before the EKS cluster exists (circular dependency)
+locals {
+  oidc_provider = trimprefix(module.eks.cluster_oidc_issuer_url, "https://")
+}
+
 data "aws_iam_policy_document" "csi_assume" {
   statement {
     effect  = "Allow"
     actions = ["sts:AssumeRoleWithWebIdentity"]
     principals {
       type        = "Federated"
-      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${trimprefix(module.eks.cluster_oidc_issuer_url, "https://")}"
-      ]
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${local.oidc_provider}"]
     }
     condition {
       test     = "StringEquals"
-      variable = "${trimprefix(module.eks.cluster_oidc_issuer_url, "https://")}:sub"
+      variable = "${local.oidc_provider}:sub"
       values   = ["system:serviceaccount:borderless:borderless-csi-sa"]
     }
     condition {
       test     = "StringEquals"
-      variable = "${trimprefix(module.eks.cluster_oidc_issuer_url, "https://")}:aud"
+      variable = "${local.oidc_provider}:aud"
       values   = ["sts.amazonaws.com"]
     }
   }
@@ -290,17 +316,24 @@ resource "aws_iam_role_policy" "csi_secrets" {
   role = aws_iam_role.csi_secrets.id
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = [
-        "secretsmanager:GetSecretValue",
-        "secretsmanager:DescribeSecret"
-      ]
-      Resource = [
-        aws_secretsmanager_secret.app.arn,
-        aws_secretsmanager_secret.alertmanager.arn
-      ]
-    }]
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
+        Resource = [
+          aws_secretsmanager_secret.app.arn,
+          aws_secretsmanager_secret.alertmanager.arn
+        ]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt", "kms:GenerateDataKey"]
+        Resource = [aws_kms_key.secrets.arn]
+      }
+    ]
   })
 }
 

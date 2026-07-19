@@ -54,6 +54,12 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Build & push backend
@@ -127,12 +133,17 @@ jobs:
           helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
           helm repo update
           kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
-          CSI_ROLE_ARN=${{ steps.csi-role.outputs.arn }} envsubst < helm/monitoring/alertmanager-secretprovider.yaml | kubectl apply -f -
+          CSI_ROLE_ARN=${{ steps.csi-role.outputs.arn }} \
+          CLUSTER_NAME=${{ env.EKS_CLUSTER_NAME }} \
+          envsubst < helm/monitoring/alertmanager-secretprovider.yaml | kubectl apply -f -
+          kubectl delete pod alertmanager-secret-sync -n monitoring --ignore-not-found
           kubectl apply -f helm/monitoring/alertmanager-secret-sync.yaml
           kubectl wait --for=condition=Ready pod/alertmanager-secret-sync -n monitoring --timeout=60s || true
+          GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }} \
+          envsubst < helm/monitoring/values-monitoring.yaml > /tmp/values-monitoring-rendered.yaml
           helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
             -n monitoring --create-namespace \
-            -f helm/monitoring/values-monitoring.yaml \
+            -f /tmp/values-monitoring-rendered.yaml \
             --wait --timeout 10m
           kubectl apply -f helm/monitoring/servicemonitor.yaml
           kubectl apply -f helm/monitoring/alertrules.yaml

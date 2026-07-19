@@ -1,3 +1,8 @@
+output "kms_key_arn" {
+  description = "KMS CMK ARN used to encrypt Secrets Manager secrets"
+  value       = aws_kms_key.secrets.arn
+}
+
 output "node_role_arn" {
   description = "IAM role ARN for EKS worker nodes"
   value       = aws_iam_role.node.arn

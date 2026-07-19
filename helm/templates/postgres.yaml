@@ -14,6 +14,17 @@ spec:
       labels:
         app: borderless-postgres
     spec:
+      serviceAccountName: borderless-csi-sa
+      volumes:
+        - name: secrets-store
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: borderless-aws-secrets
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: borderless-postgres-pvc
       containers:
         - name: postgres
           image: "{{ .Values.postgres.image }}:{{ .Values.postgres.tag }}"
@@ -44,22 +55,27 @@ spec:
                   key: POSTGRES_PASSWORD
           livenessProbe:
             exec:
-              command: ["pg_isready", "-U", "postgres"]
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER"
             initialDelaySeconds: 30
             periodSeconds: 10
             failureThreshold: 3
           readinessProbe:
             exec:
-              command: ["pg_isready", "-U", "postgres"]
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER"
             initialDelaySeconds: 5
             periodSeconds: 10
           volumeMounts:
+            - name: secrets-store
+              mountPath: /mnt/secrets
+              readOnly: true
             - name: postgres-storage
               mountPath: /var/lib/postgresql/data
-      volumes:
-        - name: postgres-storage
-          persistentVolumeClaim:
-            claimName: borderless-postgres-pvc
 ---
 apiVersion: v1
 kind: Service

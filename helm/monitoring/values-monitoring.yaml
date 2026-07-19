@@ -30,7 +30,7 @@ prometheus:
             target_label: app
 
 grafana:
-  adminPassword: admin
+  adminPassword: "${GRAFANA_ADMIN_PASSWORD}"
   service:
     type: NodePort
     nodePort: 31000
