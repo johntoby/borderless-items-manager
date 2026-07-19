@@ -295,6 +295,7 @@ grep "terraform.tfvars" ../.gitignore || echo "terraform.tfvars" >> ../.gitignor
 
 ```bash
 terraform init
+terraform plan
 terraform apply
 ```
 

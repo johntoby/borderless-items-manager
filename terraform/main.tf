@@ -1,16 +1,3 @@
-terraform {
-  required_version = ">= 1.5.0"
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-}
-
-provider "aws" {
-  region = var.aws_region
-}
 
 # ── GitHub OIDC ───────────────────────────────────────────────────────────────
 
@@ -171,7 +158,7 @@ module "eks" {
   version = "~> 20.0"
 
   cluster_name    = var.cluster_name
-  cluster_version = "1.29"
+  cluster_version = "1.35"
 
   cluster_endpoint_public_access = true
 
@@ -197,16 +184,16 @@ module "eks" {
   }
 
   # Map the node role into the cluster so kubelets can join
-  manage_aws_auth_configmap = true
-  aws_auth_roles = [
-    {
-      rolearn  = aws_iam_role.node.arn
-      username = "system:node:{{EC2PrivateDNSName}}"
-      groups   = ["system:bootstrappers", "system:nodes"]
-    }
-  ]
+  # manage_aws_auth_configmap = true
+  # aws_auth_roles = [
+  #   {
+  #     rolearn  = aws_iam_role.node.arn
+  #     username = "system:node:{{EC2PrivateDNSName}}"
+  #     groups   = ["system:bootstrappers", "system:nodes"]
+  #   }
+  # ]
 
-  tags = var.tags
+  # tags = var.tags
 }
 
 # ── ECR ──────────────────────────────────────────────────────────────────────
