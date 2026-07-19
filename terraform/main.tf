@@ -183,17 +183,22 @@ module "eks" {
     }
   }
 
-  # Map the node role into the cluster so kubelets can join
-  # manage_aws_auth_configmap = true
-  # aws_auth_roles = [
-  #   {
-  #     rolearn  = aws_iam_role.node.arn
-  #     username = "system:node:{{EC2PrivateDNSName}}"
-  #     groups   = ["system:bootstrappers", "system:nodes"]
-  #   }
-  # ]
+  access_entries = {
+    github_actions = {
+      principal_arn = aws_iam_role.github_actions.arn
+      type          = "STANDARD"
+      policy_associations = {
+        admin = {
+          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+          access_scope = {
+            type = "cluster"
+          }
+        }
+      }
+    }
+  }
 
-  # tags = var.tags
+  tags = var.tags
 }
 
 # ── ECR ──────────────────────────────────────────────────────────────────────
