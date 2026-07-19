@@ -2,9 +2,9 @@ name: Borderless Items Manager CI/CD pipeline
 
 on:
   push:
-    branches: [monitoring]
+    branches: [eks]
   pull_request:
-    branches: [monitoring]
+    branches: [eks]
 
 permissions:
   id-token: write

@@ -50,7 +50,7 @@ Terraform sets up the trust relationship between GitHub and AWS automatically:
 **`terraform/main.tf`** creates:
 
 - `aws_iam_openid_connect_provider` — registers GitHub's OIDC provider (`token.actions.githubusercontent.com`) in your AWS account so AWS knows to trust tokens it signs
-- `aws_iam_role.github_actions` — an IAM role that GitHub Actions can assume, restricted to only the `johntoby/borderless-items-manager` repo on the `monitoring` branch
+- `aws_iam_role.github_actions` — an IAM role that GitHub Actions can assume, restricted to only the `johntoby/borderless-items-manager` repo on the `eks` branch
 - `aws_iam_role_policy.github_actions` — least-privilege permissions attached to that role:
   - ECR: push images to the backend and frontend repositories only
   - EKS: describe the cluster (needed to generate a kubeconfig)
@@ -59,7 +59,7 @@ Terraform sets up the trust relationship between GitHub and AWS automatically:
 The trust policy on the role uses two conditions that must both be true before AWS will issue credentials:
 
 ```
-token.actions.githubusercontent.com:sub = repo:johntoby/borderless-items-manager:ref:refs/heads/monitoring
+token.actions.githubusercontent.com:sub = repo:johntoby/borderless-items-manager:ref:refs/heads/eks
 token.actions.githubusercontent.com:aud = sts.amazonaws.com
 ```
 
@@ -278,7 +278,7 @@ aws_region         = "us-east-1"
 cluster_name       = "borderless-cluster"
 node_instance_type = "t3.medium"
 github_repo        = "johntoby/borderless-items-manager"
-github_branch      = "monitoring"
+github_branch      = "eks"
 
 db_user       = "your-actual-db-username"
 db_password   = "your-actual-db-password"
@@ -319,7 +319,7 @@ In your GitHub repository go to **Settings → Secrets and variables → Actions
 |---|---|
 | `AWS_ROLE_ARN` | Value from `terraform output github_actions_role_arn` |
 
-### Step 4 — Push to the monitoring branch
+### Step 4 — Push to the eks branch
 
 The CI pipeline handles everything else automatically:
 
@@ -329,7 +329,7 @@ The CI pipeline handles everything else automatically:
 4. Deploys the monitoring stack — the alertmanager SMTP secret is synced the same way
 
 ```bash
-git push origin monitoring
+git push origin eks
 ```
 
 ### Step 5 — Verify

@@ -12,7 +12,7 @@ Provisions all AWS infrastructure for the Borderless Items Manager EKS deploymen
 | `aws-auth` ConfigMap | Maps the node role to `system:nodes` so workers can join the cluster |
 | ECR Repositories | `borderless-cluster-backend`, `borderless-cluster-frontend` (lifecycle: keep last 5 images) |
 | GitHub OIDC Provider | Registers `token.actions.githubusercontent.com` as a trusted identity provider in AWS |
-| GitHub Actions IAM Role | Assumed by CI via OIDC — scoped to `johntoby/borderless-items-manager` on the `monitoring` branch only |
+| GitHub Actions IAM Role | Assumed by CI via OIDC — scoped to `johntoby/borderless-items-manager` on the `eks` branch only |
 | CSI Driver IAM Role | IRSA role assumed by the `borderless-csi-sa` ServiceAccount in the `borderless` namespace |
 | Secrets Manager — `borderless-cluster/app` | Stores `DB_USER` and `DB_PASSWORD` |
 | Secrets Manager — `borderless-cluster/alertmanager` | Stores `smtp_password` for Alertmanager Gmail alerts |
@@ -25,7 +25,7 @@ There are three distinct IAM roles, each with a different trust relationship and
 ┌─────────────────────────────────────────────────────────────────────┐
 │  borderless-cluster-github-actions-role                             │
 │  Trusted by: GitHub OIDC (token.actions.githubusercontent.com)      │
-│  Assumed by: GitHub Actions CI jobs on the monitoring branch        │
+│  Assumed by: GitHub Actions CI jobs on the eks branch               │
 │  Permissions: ECR push, EKS describe, Secrets Manager read/write   │
 └─────────────────────────────────────────────────────────────────────┘
 
@@ -69,7 +69,7 @@ aws_region         = "us-east-1"
 cluster_name       = "borderless-cluster"
 node_instance_type = "t3.medium"
 github_repo        = "johntoby/borderless-items-manager"
-github_branch      = "monitoring"
+github_branch      = "eks"
 
 tags = {
   Project     = "borderless-items-manager"

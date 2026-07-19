@@ -144,10 +144,10 @@ terraform output ecr_backend_url
 terraform output ecr_frontend_url
 ```
 
-### 4 — Push to the monitoring branch
+### 4 — Push to the eks branch
 
 ```bash
-git push origin monitoring
+git push origin eks
 ```
 
 The pipeline runs automatically:
@@ -160,7 +160,7 @@ The pipeline runs automatically:
 
 ## CI/CD Pipeline
 
-The pipeline triggers on every push to the `monitoring` branch. It has three jobs:
+The pipeline triggers on every push to the `eks` branch. It has three jobs:
 
 ```
 test-backend  ──►  build-and-push  ──►  deploy
@@ -289,7 +289,7 @@ kubectl logs -l app=borderless-backend -n borderless | head -20
 
 ## Rolling Update After a New Image Push
 
-The CI pipeline handles this automatically on every push to `monitoring`. To trigger manually:
+The CI pipeline handles this automatically on every push to `eks`. To trigger manually:
 
 ```bash
 kubectl rollout restart deployment/borderless-backend -n borderless
