@@ -46,10 +46,12 @@ metadata:
   name: borderless-frontend-service
   namespace: {{ .Values.namespace }}
 spec:
-  type: NodePort
+  type: {{ .Values.frontend.serviceType | default "NodePort" }}
   selector:
     app: borderless-frontend
   ports:
     - port: {{ .Values.frontend.port }}
       targetPort: {{ .Values.frontend.port }}
+      {{- if eq ((.Values.frontend.serviceType) | default "NodePort") "NodePort" }}
       nodePort: {{ .Values.frontend.nodePort }}
+      {{- end }}

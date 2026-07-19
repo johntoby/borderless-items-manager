@@ -7,7 +7,10 @@ on:
     branches: [monitoring]
 
 env:
-  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+  AWS_REGION: us-east-1
+  ECR_BACKEND_REPO: borderless-cluster-backend
+  ECR_FRONTEND_REPO: borderless-cluster-frontend
+  EKS_CLUSTER_NAME: borderless-cluster
 
 jobs:
   test-backend:
@@ -33,18 +36,25 @@ jobs:
         run: npm test
 
   build-and-push:
-    name: Build & Push Images
+    name: Build & Push Images to ECR
     runs-on: ubuntu-latest
     needs: test-backend
     if: github.event_name == 'push'
+    outputs:
+      ecr_registry: ${{ steps.login-ecr.outputs.registry }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Log in to DockerHub
-        uses: docker/login-action@v3
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -54,44 +64,62 @@ jobs:
         with:
           context: ./backend
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/borderless-items-manager-backend:latest
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_BACKEND_REPO }}:latest
 
       - name: Build & push frontend
         uses: docker/build-push-action@v5
         with:
           context: ./frontend
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/borderless-items-manager-frontend:latest
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_FRONTEND_REPO }}:latest
 
   deploy:
-    name: Deploy to EC2 Minikube
+    name: Deploy to EKS
     runs-on: ubuntu-latest
     needs: build-and-push
     if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd ~/borderless-items-manager || git clone https://github.com/${{ github.repository }}.git ~/borderless-items-manager
-            cd ~/borderless-items-manager
-            git fetch origin
-            git checkout monitoring
-            git pull origin monitoring
-            helm upgrade --install borderless ./helm
-            kubectl rollout restart deployment/borderless-backend -n borderless
-            kubectl rollout restart deployment/borderless-frontend -n borderless
-            helm repo add prometheus-community https://prometheus-community.github.io/helm-charts || true
-            helm repo update
-            helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
-              -n monitoring --create-namespace \
-              -f helm/monitoring/values-monitoring.yaml
-            kubectl apply -f helm/monitoring/servicemonitor.yaml
-            kubectl apply -f helm/monitoring/alertrules.yaml
-            kubectl get all -n borderless
-            kubectl get pods -n monitoring
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Update kubeconfig for EKS
+        run: aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Deploy app with Helm
+        run: |
+          helm upgrade --install borderless ./helm \
+            -f helm/values-eks.yaml \
+            --set backend.image=${{ needs.build-and-push.outputs.ecr_registry }}/${{ env.ECR_BACKEND_REPO }} \
+            --set frontend.image=${{ needs.build-and-push.outputs.ecr_registry }}/${{ env.ECR_FRONTEND_REPO }} \
+            --wait --timeout 5m
+
+      - name: Deploy monitoring stack
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+          helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
+            -n monitoring --create-namespace \
+            -f helm/monitoring/values-monitoring.yaml \
+            --wait --timeout 10m
+          kubectl apply -f helm/monitoring/servicemonitor.yaml
+          kubectl apply -f helm/monitoring/alertrules.yaml
+
+      - name: Get frontend LoadBalancer URL
+        run: |
+          echo "Waiting for LoadBalancer..."
+          kubectl wait --for=jsonpath='{.status.loadBalancer.ingress}' \
+            service/borderless-frontend-service -n borderless --timeout=120s
+          kubectl get svc borderless-frontend-service -n borderless
