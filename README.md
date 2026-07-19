@@ -86,6 +86,32 @@ A three-tier application (Frontend → Backend → PostgreSQL) containerized wit
 
 ## First-Time Setup
 
+### This is the correct order for the EKS deployment: 
+
+1. Fill in terraform.tfvars with real credentials
+         │
+         ▼
+2. terraform init && terraform apply locally
+   (creates VPC, EKS, ECR, IAM roles, Secrets Manager, KMS)
+         │
+         ▼
+3. Add AWS_ROLE_ARN and GRAFANA_ADMIN_PASSWORD to GitHub Secrets
+         │
+         ▼
+4. Update helm/values-eks.yaml with real ECR URLs from terraform output
+         │
+         ▼
+5. git push origin eks  ← pipeline runs end to end
+         │
+         ▼
+6. kubectl get svc borderless-frontend-service -n borderless
+   → copy the LoadBalancer URL
+         │
+         ▼
+7. Update corsOrigin in helm/values-eks.yaml
+   git push origin eks  ← re-deploy with correct CORS
+
+
 ### 1 — Provision AWS infrastructure with Terraform
 
 ```bash
