@@ -120,6 +120,10 @@ jobs:
             --set syncSecret.enabled=true \
             --set enableSecretRotation=true \
             --wait
+          kubectl -n kube-system annotate serviceaccount secrets-store-csi-driver \
+            meta.helm.sh/release-name=secrets-provider-aws \
+            meta.helm.sh/release-namespace=kube-system \
+            --overwrite
           helm upgrade --install secrets-provider-aws aws-secrets-manager/secrets-store-csi-driver-provider-aws \
             --namespace kube-system \
             --set serviceAccount.create=false \
