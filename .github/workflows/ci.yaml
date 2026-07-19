@@ -1,3 +1,4 @@
+
 name: Borderless Items Manager CI/CD pipeline
 
 on:
@@ -110,18 +111,31 @@ jobs:
           helm repo update
           helm uninstall csi-secrets-store -n kube-system --ignore-not-found 2>/dev/null || true
           helm uninstall secrets-provider-aws -n kube-system --ignore-not-found 2>/dev/null || true
-          kubectl delete serviceaccount secrets-store-csi-driver -n kube-system --ignore-not-found 2>/dev/null || true
           kubectl delete clusterrole secrets-store-csi-driver --ignore-not-found 2>/dev/null || true
           kubectl delete clusterrolebinding secrets-store-csi-driver --ignore-not-found 2>/dev/null || true
+          # If the serviceaccount exists and is owned by another Helm release, skip deleting it to avoid disturbing that release.
+          skip_aws_provider="false"
+          existing_sa_owner=$(kubectl -n kube-system get sa secrets-store-csi-driver -o jsonpath='{.metadata.annotations.meta\.helm\.sh/release-name}' 2>/dev/null || true)
+          if [ -n "$existing_sa_owner" ]; then
+            echo "ServiceAccount secrets-store-csi-driver already exists and is owned by release: $existing_sa_owner"
+            echo "Skipping deletion of the serviceaccount to avoid interfering with that release."
+            skip_aws_provider="true"
+          else
+            kubectl delete serviceaccount secrets-store-csi-driver -n kube-system --ignore-not-found 2>/dev/null || true
+          fi
           sleep 5
           helm upgrade --install csi-secrets-store secrets-store-csi-driver/secrets-store-csi-driver \
             --namespace kube-system \
             --set syncSecret.enabled=true \
             --set enableSecretRotation=true \
             --wait
-          helm upgrade --install secrets-provider-aws aws-secrets-manager/secrets-store-csi-driver-provider-aws \
-            --namespace kube-system \
-            --wait
+          if [ "${skip_aws_provider}" != "true" ]; then
+            helm upgrade --install secrets-provider-aws aws-secrets-manager/secrets-store-csi-driver-provider-aws \
+              --namespace kube-system \
+              --wait
+          else
+            echo "Skipping secrets-provider-aws install due to existing ServiceAccount ownership conflict."
+          fi
 
       - name: Get CSI role ARN
         id: csi-role
