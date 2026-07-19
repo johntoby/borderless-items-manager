@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [monitoring]
 
+permissions:
+  id-token: write
+  contents: read
+
 env:
   AWS_REGION: us-east-1
   ECR_BACKEND_REPO: borderless-cluster-backend
@@ -48,15 +52,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
-
-      - name: Log in to ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Build & push backend
@@ -84,8 +81,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Log in to ECR
@@ -98,18 +94,42 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@v4
 
+      - name: Install Secrets Store CSI Driver
+        run: |
+          helm repo add secrets-store-csi-driver https://kubernetes-sigs.github.io/secrets-store-csi-driver/charts
+          helm repo add aws-secrets-manager https://aws.github.io/secrets-store-csi-driver-provider-aws
+          helm repo update
+          helm upgrade --install csi-secrets-store secrets-store-csi-driver/secrets-store-csi-driver \
+            --namespace kube-system \
+            --set syncSecret.enabled=true \
+            --set enableSecretRotation=true \
+            --wait
+          helm upgrade --install secrets-provider-aws aws-secrets-manager/secrets-store-csi-driver-provider-aws \
+            --namespace kube-system \
+            --wait
+
+      - name: Get CSI role ARN
+        id: csi-role
+        run: |
+          echo "arn=$(aws iam get-role --role-name borderless-cluster-csi-secrets-role --query Role.Arn --output text)" >> $GITHUB_OUTPUT
+
       - name: Deploy app with Helm
         run: |
           helm upgrade --install borderless ./helm \
             -f helm/values-eks.yaml \
             --set backend.image=${{ needs.build-and-push.outputs.ecr_registry }}/${{ env.ECR_BACKEND_REPO }} \
             --set frontend.image=${{ needs.build-and-push.outputs.ecr_registry }}/${{ env.ECR_FRONTEND_REPO }} \
+            --set secret.csiRoleArn=${{ steps.csi-role.outputs.arn }} \
             --wait --timeout 5m
 
       - name: Deploy monitoring stack
         run: |
           helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
           helm repo update
+          kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
+          CSI_ROLE_ARN=${{ steps.csi-role.outputs.arn }} envsubst < helm/monitoring/alertmanager-secretprovider.yaml | kubectl apply -f -
+          kubectl apply -f helm/monitoring/alertmanager-secret-sync.yaml
+          kubectl wait --for=condition=Ready pod/alertmanager-secret-sync -n monitoring --timeout=60s || true
           helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
             -n monitoring --create-namespace \
             -f helm/monitoring/values-monitoring.yaml \

@@ -1,3 +1,23 @@
+output "csi_role_arn" {
+  description = "IAM role ARN for the Secrets Store CSI driver service account"
+  value       = aws_iam_role.csi_secrets.arn
+}
+
+output "app_secret_arn" {
+  description = "ARN of the app secrets in Secrets Manager"
+  value       = aws_secretsmanager_secret.app.arn
+}
+
+output "alertmanager_secret_arn" {
+  description = "ARN of the Alertmanager SMTP secret in Secrets Manager"
+  value       = aws_secretsmanager_secret.alertmanager.arn
+}
+
+output "github_actions_role_arn" {
+  description = "IAM role ARN for GitHub Actions OIDC"
+  value       = aws_iam_role.github_actions.arn
+}
+
 output "cluster_name" {
   description = "EKS cluster name"
   value       = module.eks.cluster_name

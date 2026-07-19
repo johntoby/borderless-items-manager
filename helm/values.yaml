@@ -46,5 +46,5 @@ config:
   corsOrigin: "http://54.80.143.116:8080"
 
 secret:
-  dbUser: cG9zdGdyZXM=
-  dbPassword: cGFzc3dvcmQ=
+  csiRoleArn: ""  # set at deploy time via --set or values-eks.yaml
+  appSecretName: "borderless-cluster/app"

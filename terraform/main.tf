@@ -12,6 +12,91 @@ provider "aws" {
   region = var.aws_region
 }
 
+# ── GitHub OIDC ───────────────────────────────────────────────────────────────
+
+data "aws_caller_identity" "current" {}
+
+resource "aws_iam_openid_connect_provider" "github" {
+  url             = "https://token.actions.githubusercontent.com"
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
+}
+
+data "aws_iam_policy_document" "github_oidc_assume" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    principals {
+      type        = "Federated"
+      identifiers = [aws_iam_openid_connect_provider.github.arn]
+    }
+    condition {
+      test     = "StringLike"
+      variable = "token.actions.githubusercontent.com:sub"
+      values   = ["repo:${var.github_repo}:ref:refs/heads/${var.github_branch}"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "github_actions" {
+  name               = "${var.cluster_name}-github-actions-role"
+  assume_role_policy = data.aws_iam_policy_document.github_oidc_assume.json
+  tags               = var.tags
+}
+
+data "aws_iam_policy_document" "github_actions_permissions" {
+  statement {
+    effect    = "Allow"
+    actions   = ["ecr:GetAuthorizationToken"]
+    resources = ["*"]
+  }
+  statement {
+    effect = "Allow"
+    actions = [
+      "ecr:BatchCheckLayerAvailability",
+      "ecr:GetDownloadUrlForLayer",
+      "ecr:BatchGetImage",
+      "ecr:PutImage",
+      "ecr:InitiateLayerUpload",
+      "ecr:UploadLayerPart",
+      "ecr:CompleteLayerUpload"
+    ]
+    resources = [
+      aws_ecr_repository.backend.arn,
+      aws_ecr_repository.frontend.arn
+    ]
+  }
+  statement {
+    effect    = "Allow"
+    actions   = ["eks:DescribeCluster"]
+    resources = [module.eks.cluster_arn]
+  }
+  statement {
+    effect = "Allow"
+    actions = [
+      "secretsmanager:GetSecretValue",
+      "secretsmanager:DescribeSecret",
+      "secretsmanager:PutSecretValue",
+      "secretsmanager:CreateSecret"
+    ]
+    resources = [
+      aws_secretsmanager_secret.app.arn,
+      aws_secretsmanager_secret.alertmanager.arn
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "github_actions" {
+  name   = "github-actions-policy"
+  role   = aws_iam_role.github_actions.id
+  policy = data.aws_iam_policy_document.github_actions_permissions.json
+}
+
 # ── VPC ──────────────────────────────────────────────────────────────────────
 
 module "vpc" {
@@ -92,6 +177,82 @@ resource "aws_ecr_repository" "frontend" {
   }
 
   tags = var.tags
+}
+
+# ── AWS Secrets Manager ──────────────────────────────────────────────────────
+
+resource "aws_secretsmanager_secret" "app" {
+  name                    = "${var.cluster_name}/app"
+  recovery_window_in_days = 7
+  tags                    = var.tags
+}
+
+resource "aws_secretsmanager_secret_version" "app" {
+  secret_id = aws_secretsmanager_secret.app.id
+  secret_string = jsonencode({
+    DB_USER     = var.db_user
+    DB_PASSWORD = var.db_password
+  })
+}
+
+resource "aws_secretsmanager_secret" "alertmanager" {
+  name                    = "${var.cluster_name}/alertmanager"
+  recovery_window_in_days = 7
+  tags                    = var.tags
+}
+
+resource "aws_secretsmanager_secret_version" "alertmanager" {
+  secret_id     = aws_secretsmanager_secret.alertmanager.id
+  secret_string = jsonencode({ smtp_password = var.smtp_password })
+}
+
+# ── IRSA for Secrets Store CSI Driver ─────────────────────────────────────────
+
+data "aws_iam_policy_document" "csi_assume" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    principals {
+      type        = "Federated"
+      identifiers = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${trimprefix(module.eks.cluster_oidc_issuer_url, "https://")}"
+      ]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "${trimprefix(module.eks.cluster_oidc_issuer_url, "https://")}:sub"
+      values   = ["system:serviceaccount:borderless:borderless-csi-sa"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "${trimprefix(module.eks.cluster_oidc_issuer_url, "https://")}:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "csi_secrets" {
+  name               = "${var.cluster_name}-csi-secrets-role"
+  assume_role_policy = data.aws_iam_policy_document.csi_assume.json
+  tags               = var.tags
+}
+
+resource "aws_iam_role_policy" "csi_secrets" {
+  name = "csi-secrets-policy"
+  role = aws_iam_role.csi_secrets.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+      ]
+      Resource = [
+        aws_secretsmanager_secret.app.arn,
+        aws_secretsmanager_secret.alertmanager.arn
+      ]
+    }]
+  })
 }
 
 # ── ECR lifecycle policies ────────────────────────────────────────────────────

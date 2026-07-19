@@ -46,5 +46,5 @@ config:
   corsOrigin: "http://localhost"
 
 secret:
-  dbUser: cG9zdGdyZXM=
-  dbPassword: cGFzc3dvcmQ=
+  csiRoleArn: ""  # injected by CI: --set secret.csiRoleArn=<terraform output csi_role_arn>
+  appSecretName: "borderless-cluster/app"

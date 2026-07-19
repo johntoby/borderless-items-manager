@@ -17,10 +17,22 @@ spec:
         prometheus.io/port: "{{ .Values.backend.port }}"
         prometheus.io/path: "/metrics"
     spec:
+      serviceAccountName: borderless-csi-sa
+      volumes:
+        - name: secrets-store
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: borderless-aws-secrets
       containers:
         - name: backend
           image: "{{ .Values.backend.image }}:{{ .Values.backend.tag }}"
           imagePullPolicy: Always
+          volumeMounts:
+            - name: secrets-store
+              mountPath: /mnt/secrets
+              readOnly: true
           ports:
             - containerPort: {{ .Values.backend.port }}
           resources:
