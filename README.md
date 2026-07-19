@@ -9,7 +9,7 @@ A three-tier application (Frontend → Backend → PostgreSQL) containerized wit
                         │        GitHub Actions        │
                         │  (OIDC — no static keys)     │
                         └────────────┬────────────────┘
-                                     │ push to monitoring branch
+                                     │ push to eks branch
                     ┌────────────────▼────────────────┐
                     │              AWS                 │
                     │                                  │
