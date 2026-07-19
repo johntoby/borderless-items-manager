@@ -124,6 +124,7 @@ jobs:
 
       - name: Deploy app with Helm
         run: |
+          helm uninstall borderless -n borderless --ignore-not-found 2>/dev/null || true
           helm upgrade --install borderless ./helm \
             -f helm/values-eks.yaml \
             --set backend.image=${{ needs.build-and-push.outputs.ecr_registry }}/${{ env.ECR_BACKEND_REPO }} \
