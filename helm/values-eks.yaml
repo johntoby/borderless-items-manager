@@ -1,7 +1,7 @@
 namespace: borderless
 
 backend:
-  image: <AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/borderless-cluster-backend
+  image: 266735814791.dkr.ecr.us-east-1.amazonaws.com/borderless-cluster-backend
   tag: latest
   replicas: 2
   port: 5000
@@ -14,7 +14,7 @@ backend:
       memory: "256Mi"
 
 frontend:
-  image: <AWS_ACCOUNT_ID>.dkr.ecr.<AWS_REGION>.amazonaws.com/borderless-cluster-frontend
+  image: 266735814791.dkr.ecr.us-east-1.amazonaws.com/borderless-cluster-frontend
   tag: latest
   replicas: 2
   port: 80
