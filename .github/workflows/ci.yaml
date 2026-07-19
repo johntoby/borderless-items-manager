@@ -94,11 +94,14 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
       - name: Update kubeconfig for EKS
         run: aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
 
-      - name: Install Helm
-        uses: azure/setup-helm@v4
+      - name: Verify cluster connection
+        run: kubectl get nodes
 
       - name: Install Secrets Store CSI Driver
         run: |
