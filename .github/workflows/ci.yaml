@@ -113,9 +113,9 @@ jobs:
             --set syncSecret.enabled=true \
             --set enableSecretRotation=true \
             --wait
+          kubectl delete serviceaccount secrets-store-csi-driver -n kube-system --ignore-not-found
           helm upgrade --install secrets-provider-aws aws-secrets-manager/secrets-store-csi-driver-provider-aws \
             --namespace kube-system \
-            --set serviceAccount.create=false \
             --wait
 
       - name: Get CSI role ARN
