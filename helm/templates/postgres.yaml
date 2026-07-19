@@ -38,6 +38,8 @@ spec:
               cpu: {{ .Values.postgres.resources.limits.cpu }}
               memory: {{ .Values.postgres.resources.limits.memory }}
           env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
             - name: POSTGRES_DB
               valueFrom:
                 configMapKeyRef:
