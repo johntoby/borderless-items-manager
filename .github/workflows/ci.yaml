@@ -112,6 +112,8 @@ jobs:
             --namespace kube-system \
             --set syncSecret.enabled=true \
             --set enableSecretRotation=true \
+            --set secrets-store-csi-driver.syncSecret.enabled=true \
+            --set secrets-store-csi-driver.enableSecretRotation=true \
             --wait
 
       - name: Get CSI role ARN
