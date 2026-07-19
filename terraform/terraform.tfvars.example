@@ -7,6 +7,13 @@ node_instance_type = "t3.medium"
 github_repo        = "johntoby/borderless-items-manager"
 github_branch      = "eks"
 
+tags = {
+  Project     = "borderless-items-manager"
+  Environment = "production"
+  ManagedBy   = "terraform"
+}
+
+# Sensitive — fill in real values, never commit
 db_user       = "your-db-username"
 db_password   = "your-db-password"
 smtp_password = "your-gmail-app-password"
