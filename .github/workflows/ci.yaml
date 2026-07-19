@@ -115,6 +115,7 @@ jobs:
             --wait
           helm upgrade --install secrets-provider-aws aws-secrets-manager/secrets-store-csi-driver-provider-aws \
             --namespace kube-system \
+            --set provider.serviceAccount.create=false \
             --wait
 
       - name: Get CSI role ARN
