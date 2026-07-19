@@ -43,7 +43,7 @@ postgres:
   storageClassName: gp2
 
 config:
-  corsOrigin: "http://localhost"
+  corsOrigin: "http://a2d25bfe653fd47819ebd9fb11ce3fd3-1880535953.us-east-1.elb.amazonaws.com"
 
 secret:
   csiRoleArn: ""  # injected by CI: --set secret.csiRoleArn=<terraform output csi_role_arn>

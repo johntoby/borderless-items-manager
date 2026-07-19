@@ -108,9 +108,6 @@ jobs:
         run: |
           helm repo add aws-secrets-manager https://aws.github.io/secrets-store-csi-driver-provider-aws
           helm repo update
-          helm uninstall csi-secrets-store -n kube-system --ignore-not-found 2>/dev/null || true
-          helm uninstall secrets-provider-aws -n kube-system --ignore-not-found 2>/dev/null || true
-          sleep 5
           helm upgrade --install secrets-provider-aws aws-secrets-manager/secrets-store-csi-driver-provider-aws \
             --namespace kube-system \
             --set syncSecret.enabled=true \
@@ -124,8 +121,6 @@ jobs:
 
       - name: Deploy app with Helm
         run: |
-          kubectl delete namespace borderless --ignore-not-found 2>/dev/null || true
-          kubectl wait --for=delete namespace/borderless --timeout=60s 2>/dev/null || true
           helm upgrade --install borderless ./helm \
             -f helm/values-eks.yaml \
             --set backend.image=${{ needs.build-and-push.outputs.ecr_registry }}/${{ env.ECR_BACKEND_REPO }} \
